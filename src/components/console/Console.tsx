@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { DeckPanel } from "@/components/deck/DeckPanel";
 import { MixerPanel } from "@/components/mixer/MixerPanel";
+import { CameraView } from "@/components/gesture/CameraView";
 
 export function Console() {
   const { ready, error, start, engine } = useAudioEngine();
+  const [cameraOn, setCameraOn] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col bg-black text-zinc-100">
@@ -20,6 +23,18 @@ export function Console() {
           <span className={ready ? "text-emerald-400" : "text-zinc-600"}>
             {ready ? "ENGINE READY" : "ENGINE IDLE"}
           </span>
+          <button
+            type="button"
+            onClick={() => setCameraOn((v) => !v)}
+            className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest transition ${
+              cameraOn
+                ? "border-rose-500/60 bg-rose-500/10 text-rose-300"
+                : "border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-500"
+            }`}
+            aria-pressed={cameraOn}
+          >
+            {cameraOn ? "Camera · On" : "Camera · Off"}
+          </button>
         </div>
       </header>
 
@@ -49,8 +64,10 @@ export function Console() {
         </main>
       )}
 
+      <CameraView enabled={cameraOn} />
+
       <footer className="border-t border-zinc-900 px-6 py-2 text-center font-mono text-[10px] tracking-widest text-zinc-600">
-        PHASE A · TRANSPORT ONLINE · LOAD A LOCAL AUDIO FILE TO BEGIN
+        PHASE G1 · CAMERA INPUT ONLINE · GESTURE TRACKING NEXT
       </footer>
     </div>
   );
