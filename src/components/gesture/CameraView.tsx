@@ -23,6 +23,22 @@ export function CameraView({ enabled }: CameraViewProps) {
   const fpsLabel = snapshot.fps > 0 ? `${snapshot.fps.toFixed(0)} fps` : "—";
   const inferLabel =
     snapshot.inferenceMs > 0 ? `${snapshot.inferenceMs.toFixed(0)} ms` : "—";
+  const fpsClass =
+    snapshot.fps >= 25
+      ? "text-emerald-400"
+      : snapshot.fps >= 12
+        ? "text-amber-300"
+        : snapshot.fps > 0
+          ? "text-red-400"
+          : "text-zinc-200";
+  const inferClass =
+    snapshot.inferenceMs === 0
+      ? "text-zinc-200"
+      : snapshot.inferenceMs <= 40
+        ? "text-emerald-400"
+        : snapshot.inferenceMs <= 100
+          ? "text-amber-300"
+          : "text-red-400";
 
   return (
     <div className="fixed right-4 top-20 z-50 w-72 overflow-hidden rounded-xl border border-zinc-700 bg-black/85 shadow-2xl backdrop-blur">
@@ -77,11 +93,11 @@ export function CameraView({ enabled }: CameraViewProps) {
         </div>
         <div className="flex flex-col">
           <span className="text-zinc-500">FPS</span>
-          <span className="text-zinc-200">{fpsLabel}</span>
+          <span className={fpsClass}>{fpsLabel}</span>
         </div>
         <div className="flex flex-col">
           <span className="text-zinc-500">Infer</span>
-          <span className="text-zinc-200">{inferLabel}</span>
+          <span className={inferClass}>{inferLabel}</span>
         </div>
       </div>
     </div>
