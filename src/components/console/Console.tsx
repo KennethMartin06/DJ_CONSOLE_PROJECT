@@ -67,7 +67,7 @@ export function Console() {
       <CameraView enabled={cameraOn} />
 
       <footer className="border-t border-zinc-900 px-6 py-2 text-center font-mono text-[10px] tracking-widest text-zinc-600">
-        PHASE G1 · CAMERA INPUT ONLINE · GESTURE TRACKING NEXT
+        PHASE G5 · FIST IN DECK REGION + VERTICAL HAND POSITION → DECK VOLUME
       </footer>
     </div>
   );

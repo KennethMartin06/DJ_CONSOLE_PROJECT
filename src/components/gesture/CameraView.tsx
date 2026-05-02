@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCamera } from "@/hooks/useCamera";
 import { useHandTracker } from "@/hooks/useHandTracker";
+import { GestureMapper } from "@/lib/gesture/mapper";
 import { HandOverlay } from "./HandOverlay";
 
 interface CameraViewProps {
@@ -16,6 +18,20 @@ export function CameraView({ enabled }: CameraViewProps) {
     loading: trackerLoading,
     error: trackerError,
   } = useHandTracker(videoRef, trackingEnabled);
+
+  useEffect(() => {
+    if (!trackingEnabled) {
+      GestureMapper.instance().reset();
+      return;
+    }
+    GestureMapper.instance().update(snapshot);
+  }, [snapshot, trackingEnabled]);
+
+  useEffect(() => {
+    return () => {
+      GestureMapper.instance().reset();
+    };
+  }, []);
 
   if (!enabled) return null;
 

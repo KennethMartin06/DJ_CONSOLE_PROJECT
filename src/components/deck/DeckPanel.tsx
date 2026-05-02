@@ -4,6 +4,7 @@ import { useCallback, useRef } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
 import type { DeckId } from "@/lib/audio-engine";
 import { useDeck } from "@/hooks/useDeck";
+import { useGestureEngagement } from "@/hooks/useGestureEngagement";
 
 interface DeckPanelProps {
   id: DeckId;
@@ -11,13 +12,29 @@ interface DeckPanelProps {
   onLoadStart: () => Promise<void>;
 }
 
-const ACCENT: Record<DeckId, { ring: string; bar: string; label: string }> = {
-  A: { ring: "ring-cyan-400/60", bar: "bg-cyan-400", label: "text-cyan-300" },
-  B: { ring: "ring-orange-400/60", bar: "bg-orange-400", label: "text-orange-300" },
+const ACCENT: Record<
+  DeckId,
+  { ring: string; bar: string; label: string; glow: string; glowText: string }
+> = {
+  A: {
+    ring: "ring-cyan-400/60",
+    bar: "bg-cyan-400",
+    label: "text-cyan-300",
+    glow: "ring-2 ring-cyan-400 shadow-[0_0_28px_rgba(34,211,238,0.45)]",
+    glowText: "text-cyan-300",
+  },
+  B: {
+    ring: "ring-orange-400/60",
+    bar: "bg-orange-400",
+    label: "text-orange-300",
+    glow: "ring-2 ring-orange-400 shadow-[0_0_28px_rgba(251,146,60,0.45)]",
+    glowText: "text-orange-300",
+  },
 };
 
 export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
   const snap = useDeck(id, ready);
+  const engagement = useGestureEngagement(id);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const accent = ACCENT[id];
 
@@ -66,7 +83,9 @@ export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
 
   return (
     <section
-      className={`flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 ring-1 ${accent.ring}`}
+      className={`flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 ring-1 transition-shadow duration-150 ${accent.ring} ${
+        engagement.engaged ? accent.glow : ""
+      }`}
       aria-label={`Deck ${id}`}
     >
       <header className="flex items-center justify-between">
@@ -136,7 +155,13 @@ export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
         </button>
 
         <div className="flex flex-1 items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500">Vol</span>
+          <span
+            className={`text-[10px] uppercase tracking-widest ${
+              engagement.engaged ? `${accent.glowText} animate-pulse` : "text-zinc-500"
+            }`}
+          >
+            {engagement.engaged ? `✋${engagement.hand?.[0] ?? ""}` : "Vol"}
+          </span>
           <input
             type="range"
             min={0}
