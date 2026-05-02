@@ -7,10 +7,13 @@ export interface NormalizedLandmark {
 
 export type Handedness = "Left" | "Right";
 
+export type Posture = "OPEN" | "FIST" | "PINCH" | "POINT" | "PEACE" | "UNKNOWN";
+
 export interface HandObservation {
   landmarks: NormalizedLandmark[];
   handedness: Handedness;
   score: number;
+  posture: Posture;
 }
 
 export interface TrackerSnapshot {

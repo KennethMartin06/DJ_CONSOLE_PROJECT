@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { HandTracker } from "@/lib/gesture/tracker";
 import { EMPTY_SNAPSHOT } from "@/lib/gesture/types";
 import type { TrackerSnapshot } from "@/lib/gesture/types";
+
+const FRAME_INTERVAL_MS = 33;
 
 export function useHandTracker(
   videoRef: RefObject<HTMLVideoElement | null>,
@@ -13,17 +15,23 @@ export function useHandTracker(
   const [snapshot, setSnapshot] = useState<TrackerSnapshot>(EMPTY_SNAPSHOT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trackerRef = useRef<HandTracker | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
 
     let cancelled = false;
     let rafId: number | null = null;
-    const tracker = new HandTracker();
-    trackerRef.current = tracker;
+    let lastSubmit = 0;
     setLoading(true);
     setError(null);
+
+    const tracker = new HandTracker();
+    tracker.onSnapshot((s) => {
+      if (!cancelled) setSnapshot(s);
+    });
+    tracker.onError((msg) => {
+      if (!cancelled) setError(msg);
+    });
 
     tracker
       .load()
@@ -37,9 +45,15 @@ export function useHandTracker(
         const loop = () => {
           if (cancelled) return;
           const video = videoRef.current;
-          if (video && video.readyState >= 2 && !video.paused) {
-            const next = tracker.detect(video, performance.now());
-            setSnapshot(next);
+          const now = performance.now();
+          if (
+            video &&
+            video.readyState >= 2 &&
+            !video.paused &&
+            now - lastSubmit >= FRAME_INTERVAL_MS
+          ) {
+            lastSubmit = now;
+            void tracker.submit(video, now);
           }
           rafId = requestAnimationFrame(loop);
         };
@@ -55,7 +69,6 @@ export function useHandTracker(
       cancelled = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
       tracker.dispose();
-      trackerRef.current = null;
       setSnapshot(EMPTY_SNAPSHOT);
     };
   }, [enabled, videoRef]);

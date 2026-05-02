@@ -63,6 +63,22 @@ export function CameraView({ enabled }: CameraViewProps) {
             <div className="pointer-events-none absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-cyan-300">
               {handCount} hand{handCount === 1 ? "" : "s"}
             </div>
+            {snapshot.hands.length > 0 && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-2 flex flex-wrap items-center justify-center gap-1.5 px-2">
+                {snapshot.hands.map((hand) => (
+                  <span
+                    key={hand.handedness}
+                    className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest backdrop-blur ${
+                      hand.handedness === "Left"
+                        ? "bg-cyan-500/30 text-cyan-100"
+                        : "bg-orange-500/30 text-orange-100"
+                    }`}
+                  >
+                    {hand.handedness[0]} · {hand.posture}
+                  </span>
+                ))}
+              </div>
+            )}
           </>
         )}
 
