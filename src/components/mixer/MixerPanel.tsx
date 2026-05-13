@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
 import type { MixerSnapshot } from "@/lib/audio-engine";
+import { useGestureCrossfader } from "@/hooks/useGestureCrossfader";
 
 interface MixerPanelProps {
   ready: boolean;
@@ -10,6 +11,7 @@ interface MixerPanelProps {
 
 export function MixerPanel({ ready }: MixerPanelProps) {
   const [snap, setSnap] = useState<MixerSnapshot | null>(null);
+  const xfaderEngagement = useGestureCrossfader();
 
   useEffect(() => {
     if (!ready) return;
@@ -34,10 +36,13 @@ export function MixerPanel({ ready }: MixerPanelProps) {
 
   const xfader = snap?.crossfader ?? 0;
   const master = snap?.master ?? 0.85;
+  const engaged = xfaderEngagement.engaged;
 
   return (
     <section
-      className="flex flex-col items-center gap-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-5"
+      className={`flex flex-col items-center gap-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 transition-shadow duration-150 ${
+        engaged ? "ring-2 ring-fuchsia-400 shadow-[0_0_28px_rgba(232,121,249,0.45)]" : ""
+      }`}
       aria-label="Mixer"
     >
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">Mixer</p>
@@ -64,7 +69,13 @@ export function MixerPanel({ ready }: MixerPanelProps) {
       <div className="w-full">
         <div className="mb-2 flex justify-between text-[10px] uppercase tracking-widest">
           <span className="text-cyan-400">A</span>
-          <span className="text-zinc-500">Crossfade</span>
+          <span
+            className={
+              engaged ? "text-fuchsia-300 animate-pulse" : "text-zinc-500"
+            }
+          >
+            {engaged ? "✋✋ Crossfade" : "Crossfade"}
+          </span>
           <span className="text-orange-400">B</span>
         </div>
         <input

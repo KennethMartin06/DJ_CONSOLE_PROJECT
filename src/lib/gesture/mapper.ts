@@ -2,22 +2,34 @@ import { AudioEngine } from "@/lib/audio-engine";
 import type { DeckId } from "@/lib/audio-engine";
 import type { Handedness, HandObservation, TrackerSnapshot } from "./types";
 
-export type GestureSource = "fist-vol";
+export type DeckGestureSource = "fist-vol";
+export type CrossfaderGestureSource = "two-open-xfader";
 
 export interface DeckEngagement {
   engaged: boolean;
   value: number;
-  source: GestureSource | null;
+  source: DeckGestureSource | null;
   hand: Handedness | null;
 }
 
-export type EngagementState = Record<DeckId, DeckEngagement>;
+export interface CrossfaderEngagement {
+  engaged: boolean;
+  value: number;
+  source: CrossfaderGestureSource | null;
+}
 
-const IDLE_A: DeckEngagement = { engaged: false, value: 0, source: null, hand: null };
-const IDLE_B: DeckEngagement = { engaged: false, value: 0, source: null, hand: null };
+export interface EngagementState {
+  A: DeckEngagement;
+  B: DeckEngagement;
+  crossfader: CrossfaderEngagement;
+}
+
+const IDLE_DECK: DeckEngagement = { engaged: false, value: 0, source: null, hand: null };
+const IDLE_XFADER: CrossfaderEngagement = { engaged: false, value: 0, source: null };
 
 const DECK_A_MAX_DISPLAY_X = 0.45;
 const DECK_B_MIN_DISPLAY_X = 0.55;
+const XFADER_HALF_RANGE = 0.25;
 
 type Listener = (state: EngagementState) => void;
 
@@ -28,7 +40,11 @@ function clamp(v: number, min: number, max: number): number {
 export class GestureMapper {
   private static _instance: GestureMapper | null = null;
 
-  private state: EngagementState = { A: { ...IDLE_A }, B: { ...IDLE_B } };
+  private state: EngagementState = {
+    A: { ...IDLE_DECK },
+    B: { ...IDLE_DECK },
+    crossfader: { ...IDLE_XFADER },
+  };
   private listeners = new Set<Listener>();
 
   static instance(): GestureMapper {
@@ -39,8 +55,11 @@ export class GestureMapper {
   private constructor() {}
 
   update(snapshot: TrackerSnapshot): void {
-    const fistA = this.bestFistInRegion(snapshot.hands, "A");
-    const fistB = this.bestFistInRegion(snapshot.hands, "B");
+    const xfaderPair = this.findCrossfaderHands(snapshot.hands);
+    const xfaderActive = xfaderPair !== null;
+
+    const fistA = xfaderActive ? null : this.bestFistInRegion(snapshot.hands, "A");
+    const fistB = xfaderActive ? null : this.bestFistInRegion(snapshot.hands, "B");
 
     const nextA = fistA
       ? this.engageVolume("A", fistA)
@@ -50,7 +69,17 @@ export class GestureMapper {
       ? this.engageVolume("B", fistB)
       : { ...this.state.B, engaged: false, source: null, hand: null };
 
-    const next: EngagementState = { A: nextA, B: nextB };
+    let nextXFader: CrossfaderEngagement;
+    if (xfaderPair) {
+      const avg = (xfaderPair.left + xfaderPair.right) / 2;
+      const value = clamp((avg - 0.5) / XFADER_HALF_RANGE, -1, 1);
+      this.applyCrossfader(value);
+      nextXFader = { engaged: true, value, source: "two-open-xfader" };
+    } else {
+      nextXFader = { ...this.state.crossfader, engaged: false, source: null };
+    }
+
+    const next: EngagementState = { A: nextA, B: nextB, crossfader: nextXFader };
     if (this.changed(next)) {
       this.state = next;
       for (const l of this.listeners) l(this.state);
@@ -58,7 +87,11 @@ export class GestureMapper {
   }
 
   reset(): void {
-    this.state = { A: { ...IDLE_A }, B: { ...IDLE_B } };
+    this.state = {
+      A: { ...IDLE_DECK },
+      B: { ...IDLE_DECK },
+      crossfader: { ...IDLE_XFADER },
+    };
     for (const l of this.listeners) l(this.state);
   }
 
@@ -89,6 +122,17 @@ export class GestureMapper {
     return best;
   }
 
+  private findCrossfaderHands(hands: HandObservation[]): { left: number; right: number } | null {
+    const opens = hands.filter((h) => h.posture === "OPEN" && h.landmarks[0]);
+    if (opens.length !== 2) return null;
+    const xs = opens
+      .map((h) => 1 - (h.landmarks[0]?.x ?? 0.5))
+      .sort((a, b) => a - b);
+    const [left, right] = xs;
+    if (left >= 0.5 || right <= 0.5) return null;
+    return { left, right };
+  }
+
   private engageVolume(deck: DeckId, hand: HandObservation): DeckEngagement {
     const wrist = hand.landmarks[0];
     const value = clamp(1 - (wrist?.y ?? 0.5), 0, 1);
@@ -106,6 +150,16 @@ export class GestureMapper {
     }
   }
 
+  private applyCrossfader(value: number): void {
+    const engine = AudioEngine.instance();
+    if (!engine.isReady()) return;
+    try {
+      engine.getMixer().setCrossfader(value);
+    } catch {
+      /* engine torn down mid-update */
+    }
+  }
+
   private changed(next: EngagementState): boolean {
     for (const id of ["A", "B"] as DeckId[]) {
       const a = this.state[id];
@@ -113,6 +167,10 @@ export class GestureMapper {
       if (a.engaged !== b.engaged || a.source !== b.source || a.hand !== b.hand) return true;
       if (Math.abs(a.value - b.value) > 0.005) return true;
     }
+    const a = this.state.crossfader;
+    const b = next.crossfader;
+    if (a.engaged !== b.engaged || a.source !== b.source) return true;
+    if (Math.abs(a.value - b.value) > 0.005) return true;
     return false;
   }
 }
