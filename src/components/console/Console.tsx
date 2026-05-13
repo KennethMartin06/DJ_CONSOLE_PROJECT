@@ -67,7 +67,7 @@ export function Console() {
       <CameraView enabled={cameraOn} />
 
       <footer className="border-t border-zinc-900 px-6 py-2 text-center font-mono text-[10px] tracking-widest text-zinc-600">
-        PHASE G6 · FIST → DECK VOL · BOTH PALMS STRADDLING CENTER → CROSSFADER
+        PHASE G7 · FIST=VOL · PINCH+ROTATE=EQ (HI/MID/LO BY HAND HEIGHT) · OPEN×2=XFADE
       </footer>
     </div>
   );

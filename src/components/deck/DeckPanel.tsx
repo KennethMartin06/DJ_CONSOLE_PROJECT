@@ -2,9 +2,16 @@
 
 import { useCallback, useRef } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
-import type { DeckId } from "@/lib/audio-engine";
+import type { DeckId, EqBand } from "@/lib/audio-engine";
 import { useDeck } from "@/hooks/useDeck";
 import { useGestureEngagement } from "@/hooks/useGestureEngagement";
+import { useGestureEq } from "@/hooks/useGestureEq";
+
+const EQ_BANDS: { band: EqBand; label: string }[] = [
+  { band: "high", label: "HI" },
+  { band: "mid", label: "MID" },
+  { band: "low", label: "LO" },
+];
 
 interface DeckPanelProps {
   id: DeckId;
@@ -35,8 +42,19 @@ const ACCENT: Record<
 export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
   const snap = useDeck(id, ready);
   const engagement = useGestureEngagement(id);
+  const eqEngagement = useGestureEq(id);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const accent = ACCENT[id];
+
+  const handleEq = useCallback(
+    (band: EqBand, e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!ready) return;
+      AudioEngine.instance().getDeck(id).setEq(band, Number(e.target.value) / 100);
+    },
+    [id, ready],
+  );
+
+  const anyEngaged = engagement.engaged || eqEngagement.engaged;
 
   const handleFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,7 +102,7 @@ export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
   return (
     <section
       className={`flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5 ring-1 transition-shadow duration-150 ${accent.ring} ${
-        engagement.engaged ? accent.glow : ""
+        anyEngaged ? accent.glow : ""
       }`}
       aria-label={`Deck ${id}`}
     >
@@ -139,6 +157,45 @@ export function DeckPanel({ id, ready, onLoadStart }: DeckPanelProps) {
         className="h-1 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-zinc-200 disabled:opacity-30"
         aria-label="Track position"
       />
+
+      <div className="space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-2">
+        {EQ_BANDS.map(({ band, label }) => {
+          const value = snap?.eq[band] ?? 0;
+          const isActive =
+            eqEngagement.engaged && eqEngagement.band === band;
+          const db = Math.round(value * 18);
+          return (
+            <div key={band} className="flex items-center gap-2">
+              <span
+                className={`w-7 font-mono text-[10px] uppercase tracking-widest ${
+                  isActive ? `${accent.glowText} animate-pulse` : "text-zinc-500"
+                }`}
+              >
+                {isActive ? "✋" : label}
+              </span>
+              <input
+                type="range"
+                min={-100}
+                max={100}
+                step={1}
+                value={Math.round(value * 100)}
+                onChange={(e) => handleEq(band, e)}
+                disabled={!ready}
+                className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-zinc-700/40 via-zinc-800 to-zinc-700/40 accent-zinc-200 disabled:opacity-30"
+                aria-label={`Deck ${id} ${band} EQ`}
+              />
+              <span
+                className={`w-10 text-right font-mono text-[10px] ${
+                  isActive ? accent.glowText : "text-zinc-500"
+                }`}
+              >
+                {db > 0 ? "+" : ""}
+                {db}dB
+              </span>
+            </div>
+          );
+        })}
+      </div>
 
       <div className="flex items-center gap-3">
         <button

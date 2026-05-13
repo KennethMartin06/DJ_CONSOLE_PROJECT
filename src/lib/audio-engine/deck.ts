@@ -1,6 +1,12 @@
-import type { DeckId, DeckSnapshot } from "./types";
+import type { DeckId, DeckSnapshot, EqBand } from "./types";
 
 type Listener = (snap: DeckSnapshot) => void;
+
+const EQ_DB_RANGE = 18;
+const EQ_LOW_HZ = 80;
+const EQ_MID_HZ = 1000;
+const EQ_MID_Q = 0.5;
+const EQ_HIGH_HZ = 8000;
 
 export class Deck {
   readonly id: DeckId;
@@ -17,13 +23,38 @@ export class Deck {
   private playing = false;
   private vol = 1;
 
+  private eqLow: BiquadFilterNode;
+  private eqMid: BiquadFilterNode;
+  private eqHigh: BiquadFilterNode;
+
   private listeners = new Set<Listener>();
 
   constructor(context: AudioContext, id: DeckId) {
     this.context = context;
     this.id = id;
+
+    this.eqLow = context.createBiquadFilter();
+    this.eqLow.type = "lowshelf";
+    this.eqLow.frequency.value = EQ_LOW_HZ;
+    this.eqLow.gain.value = 0;
+
+    this.eqMid = context.createBiquadFilter();
+    this.eqMid.type = "peaking";
+    this.eqMid.frequency.value = EQ_MID_HZ;
+    this.eqMid.Q.value = EQ_MID_Q;
+    this.eqMid.gain.value = 0;
+
+    this.eqHigh = context.createBiquadFilter();
+    this.eqHigh.type = "highshelf";
+    this.eqHigh.frequency.value = EQ_HIGH_HZ;
+    this.eqHigh.gain.value = 0;
+
     this.output = context.createGain();
     this.output.gain.value = this.vol;
+
+    this.eqLow.connect(this.eqMid);
+    this.eqMid.connect(this.eqHigh);
+    this.eqHigh.connect(this.output);
   }
 
   async load(file: File | Blob, name?: string): Promise<{ durationMs: number }> {
@@ -41,7 +72,7 @@ export class Deck {
     if (!this.buffer || this.playing) return;
     const src = this.context.createBufferSource();
     src.buffer = this.buffer;
-    src.connect(this.output);
+    src.connect(this.eqLow);
     src.onended = () => {
       if (this.source !== src) return;
       this.playing = false;
@@ -92,6 +123,17 @@ export class Deck {
     this.notify();
   }
 
+  setEq(band: EqBand, value: number): void {
+    const v = clamp(value, -1, 1);
+    const node = this.bandNode(band);
+    node.gain.setTargetAtTime(v * EQ_DB_RANGE, this.context.currentTime, 0.02);
+    this.notify();
+  }
+
+  getEq(band: EqBand): number {
+    return clamp(this.bandNode(band).gain.value / EQ_DB_RANGE, -1, 1);
+  }
+
   getPositionSeconds(): number {
     if (!this.buffer) return 0;
     if (this.playing) {
@@ -118,7 +160,18 @@ export class Deck {
       positionMs: this.getPositionSeconds() * 1000,
       durationMs: (this.buffer?.duration ?? 0) * 1000,
       volume: this.vol,
+      eq: {
+        low: this.getEq("low"),
+        mid: this.getEq("mid"),
+        high: this.getEq("high"),
+      },
     };
+  }
+
+  private bandNode(band: EqBand): BiquadFilterNode {
+    if (band === "low") return this.eqLow;
+    if (band === "mid") return this.eqMid;
+    return this.eqHigh;
   }
 
   private stopSource(): void {
